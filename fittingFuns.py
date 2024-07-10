@@ -1,22 +1,20 @@
+from math import sqrt
 import vars
-import seaborn as sns
 import numpy as np
-import scipy as sp
-import matplotlib as plt
 import lmfit
-import models
 import dataFuns as dF
 import pyDOE
 
-def graphDiff(graph):
+def kmDiff(graph):
     diff = 0
     for i in range(vars.days):
-        diff += (graph[i] - vars.ideal[i]) ** 2
+        diff += (graph[i] - vars.idealKM[i]) ** 2
+        
     return diff
 
-#LHS, changing only the vars that are set to vary
+#LHS, changing only the vars that are set to vary. Only for KM
 #Outputs multiple sets of parameters
-def lhs(n_samples=100):
+def lhsKM(n_samples=100):
     varying_params = [p for p in vars.params.values() if p.vary]
     bounds = [(p.min, p.max) for p in varying_params]
     samples = pyDOE.lhs(len(varying_params), samples=n_samples)
@@ -38,18 +36,18 @@ def lhs(n_samples=100):
     return output
 
 #Objective function
-def residual(params, n):
-    allParams = np.empty((n, 3), dtype=np.float16)
-
-    allParams[:, 0] = sp.stats.lognorm.rvs(params.get('gDistr'), scale=np.exp(params.get('g')), size=n)
-    allParams[:, 1] = sp.stats.lognorm.rvs(params.get('dDistr'), scale=np.exp(params.get('d')), size=n)
-    allParams[:, 2] = sp.stats.lognorm.rvs(params.get('rDistr'), scale=np.exp(params.get('r')), size=n)
-
-    sizes = models.gdr(allParams, True)
-    sizes = dF.transform(sizes)
-    progs = dF.findProgs(sizes)
-    KM = dF.makeKM(progs)
-
-    diff = graphDiff(KM)
-    
+def residualKM(params):
+    KM = dF.parsToKM(params)
+    diff = kmDiff(KM)
     return diff
+
+#def lhsSize(n_samples=200):
+    pars = lmfit.Parameters()
+    params.add('g', value=0.02, min=0.01, max=0.06, vary=True)
+    params.add('d', value=0.15, min=0.03, max=0.25, vary=True)
+    params.add('r', value=0.04, min=0, max=0.05, vary=True)
+
+
+#def residualSize(params, ideal):
+    size = 
+    for i in range(vars.days):
