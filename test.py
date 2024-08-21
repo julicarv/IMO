@@ -4,44 +4,53 @@ import fittingFuns
 import matplotlib.pyplot as plt
 import lmfit
 import fittingFuns
+import numpy as np
+import sys
 
 #LHS to find a decent starting fit
-minDiff = 999999
-lhs_params = fittingFuns.lhsKM(vars.lhs_n)
+#bounds = [(vars.params[p].min, vars.params[p].max) for p in vars.params]
+#lhs_params = 
 
-bestLHSparams = vars.params
-for param_set in lhs_params:
-    if fittingFuns.residualKM(param_set) < minDiff:
-        bestLHSparams = param_set
-        minDiff = fittingFuns.residualKM(param_set)
+lhs_params = fittingFuns.lhsKM()
+
+bestLHSparams, minDiffs = fittingFuns.bestLHS(fittingFuns.residualKM, lhs_params)
+
+vizData, bounds = dataFuns.makeVizData(bestLHSparams)
+print(minDiffs)
+print(vizData)
+dataFuns.viz(vizData, bounds, ['g', 'd', 'r'])
+
+sys.exit()
 
 #New width on each side is smaller
-for p_name in bestLHSparams:
-    bestLHSparams[p_name].max = 1/5 * vars.params[p_name].max + 4/5 * vars.params[p_name].value
-    bestLHSparams[p_name].min = 1/5 * vars.params[p_name].min + 4/5 * vars.params[p_name].value
-print(bestLHSparams)
+for i in range(vars.topLHS):
+    for p_name in bestLHSparams[i]:
+        bestLHSparams[i][p_name].max = 1/5 * vars.params[p_name].max + 4/5 * bestLHSparams[i][p_name].value
+        bestLHSparams[i][p_name].min = 1/5 * vars.params[p_name].min + 4/5 * bestLHSparams[i][p_name].value
 
 
-optimiser_kws = {'method':'least_squares', 'xtol':1e-12, 'ftol':1e-10, 'max_nfev':200, 'verbose':2}
-fit_obj = lmfit.minimize(fittingFuns.residualKM, bestLHSparams, **optimiser_kws)
-bestParams = fit_obj.params
+optimizer_kws = {'method':'least_squares', 'xtol':1e-12, 'ftol':1e-10, 'max_nfev':200, 'verbose':2}
+bestParams = []
+for i in range(vars.topLHS):
+    fit_obj = lmfit.minimize(fittingFuns.residualKM, bestLHSparams[i], **optimizer_kws)
+    bestParams.append(fit_obj.params)
 
 
 #New part of the code
-bestKM = dataFuns.parsToKM(bestParams)
+bestKM = [dataFuns.parsToKM(bestParams[i]) for i in range(vars.topLHS)]
+kmDiffs = [sum((bestKM[i] - vars.idealKM[i]) ** 2 for i in range(vars.days)) for i in range(vars.topLHS)]
 
-#Need to change bestLHSparams format before doing this line
-#lhsKM = dataFuns.parsToKM(bestLHSparams)
-
-print(bestParams)
-
+bestKM = bestKM[np.argmin(kmDiffs)]
+print(np.min(kmDiffs))
 
 #New part of the code
 plt.figure(figsize=(10, 6))
 
-plt.plot(range(vars.days), bestKM, color='blue', label='fit')
-plt.plot(range(vars.days), vars.idealKM, color='red', label='ideal')
-#plt.plot(range(vars.days), lhsKM, color='green', label='lhs')
+plt.plot(range(vars.days), vars.idealKM, color=(0, 0, 1), label='ideal')
+#for i, km in enumerate(bestKM):
+#    plt.plot(range(vars.days), km, color=((3*i/(vars.topLHS)%1), i/(vars.topLHS), 0), label='fit ' + str(i))
+plt.plot(range(vars.days), bestKM, color=(1, 0, 0), label='best fit')
+plt.plot(range(vars.days), dataFuns.parsToKM(bestLHSparams[0]), color=(0, 1, 0), label='best lhs')
 
 plt.xlabel('days')
 plt.ylabel('pfs')
